@@ -84,7 +84,7 @@ class Value
   end
 
   def coerce(other)
-    [self, other]
+    [other, self]
   end
 end
 
