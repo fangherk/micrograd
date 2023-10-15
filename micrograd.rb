@@ -4,7 +4,7 @@ require 'pry'
 class Value
   attr_accessor :data, :gradient, :_backwards, :prev
 
-  def initialize(data:, gradient: 0, prev: [])
+  def initialize(data, gradient: 0, prev: [])
     @data = data
     @gradient = gradient
     @prev = Set.new(prev)
@@ -27,8 +27,8 @@ class Value
   end
 
   def +(other)
-    other = other.is_a?(Value) ? other : Value.new(data: other)
-    output = Value.new(data:data + other.data, prev: [self, other])
+    other = other.is_a?(Value) ? other : Value.new(other)
+    output = Value.new(data + other.data, prev: [self, other])
 
     _backwards = Proc.new do
       self.gradient += 1.0 * output.gradient
@@ -39,14 +39,30 @@ class Value
   end
 
   def -(other)
-    other = other.is_a?(Value) ? other : Value.new(data: other)
+    other = other.is_a?(Value) ? other : Value.new(other)
     other.data = -other.data
     self + other
   end
 
+  # This is a unary minus
+  def -@
+    Value.new(-data)
+  end
+
   def *(other)
-    other = other.is_a?(Value) ? other : Value.new(data: other)
-    output = Value.new(data:data * other.data, prev: [self, other])
+    other = other.is_a?(Value) ? other : Value.new(other)
+    output = Value.new(data * other.data, prev: [self, other])
+    _backwards = Proc.new do
+      self.gradient += other.data * output.gradient
+      other.gradient += data * output.gradient
+    end
+    output._backwards = _backwards
+    output
+  end
+
+  def /(other)
+    other = other.is_a?(Value) ? other : Value.new(other)
+    output = Value.new(data * (other.data ** (-1)), prev: [self, other])
     _backwards = Proc.new do
       self.gradient += other.data * output.gradient
       other.gradient += data * output.gradient
@@ -56,7 +72,7 @@ class Value
   end
 
   def **(other)
-    output = Value.new(data: @data**other, prev: [self])
+    output = Value.new(@data**other, prev: [self])
     _backwards = Proc.new do
       self.gradient += other * @data ** (other-1) * output.gradient
     end
@@ -66,7 +82,7 @@ class Value
 
   def tanh
     t = (Math.exp(2*@data)- 1)/ (Math.exp(2*@data) + 1)
-    output = Value.new(data: t, prev: [self])
+    output = Value.new(t, prev: [self])
 
     _backwards = Proc.new do
       self.gradient += (1 - t**2) * output.gradient
@@ -76,7 +92,7 @@ class Value
   end
 
   def inspect
-    "Value(data=#{{data:,gradient:, _backwards: }})"
+    "Value(#{{data:,gradient:}})"
   end
 
   def to_s
@@ -84,15 +100,15 @@ class Value
   end
 
   def coerce(other)
-    [other, self]
+    [Value.new(other), self]
   end
 end
 
 class Neuron
   attr_accessor :w, :b
   def initialize(n_inputs)
-    @w = n_inputs.times.map { |n| Value.new(data:Random.rand * 2 - 1) } # -1 to 1
-    @b = Value.new(data:Random.rand * 2 - 1)
+    @w = n_inputs.times.map { |n| Value.new(Random.rand * 2 - 1) } # -1 to 1
+    @b = Value.new(Random.rand * 2 - 1)
   end
 
   def run(x)
@@ -143,9 +159,9 @@ class MLP
   end
 end
 
-# a = Value.new(data:2.0)
-# x = Value.new(data:3.0)
-# b = Value.new(data:4.0)
+# a = Value.new(2.0)
+# x = Value.new(3.0)
+# b = Value.new(4.0)
 # o = a * x
 # y = o + b
 # y.gradient = 1
